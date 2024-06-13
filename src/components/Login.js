@@ -1,13 +1,24 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import Header from './Header';
 import { bg_image } from '../utils/constants';
+import { checkValiddata } from '../utils/validate';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from '../utils/firebase';
+import { useNavigate } from 'react-router-dom';
+import {updateProfile } from "firebase/auth";
+import { useDispatch } from 'react-redux';
+import { addUserinfo } from '../utils/userSlice';
 
 function Login() {
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [nameFocused, setnameFocused] = useState(false);
 
-  const [signinfo,setsigninfo] = useState(true);
+  const [signinfo, setsigninfo] = useState(true);
+  const [errormessage, seterrormessage] = useState(null);
+
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
 
 
   const handleEmailFocus = () => {
@@ -40,41 +51,91 @@ function Login() {
     }
   };
 
-  const handleClick = () =>{
-        
-     setsigninfo(!signinfo);
-  
+  const handletoogle = () => {
+    setsigninfo(!signinfo);
+  }
+
+  const email = useRef(null);
+  const password = useRef(null);
+  const name = useRef(null);
+
+  const handleClick = () => {
+    const message = checkValiddata(email.current.value, password.current.value);
+
+    seterrormessage(message);
+
+    if (message) return;
+
+    if (!signinfo) {
+      createUserWithEmailAndPassword(auth, email.current.value, password.current.value)
+        .then((userCredential) => {
+          const user = userCredential.user;
+          updateProfile(user, {
+            displayName: name.current.value
+          }).then(() => {
+             const {uid , email , displayName} = auth.currentUser;
+             dispatch(addUserinfo({uid : uid , email : email , displayName : displayName})); 
+            navigate("/browser");
+          }).catch((error) => {
+            // An error occurred
+            // ...
+          });
+          
+          
+        })
+        .catch((error) => {
+          const errorCode = error.code;
+          const errorMessage = error.message;
+          seterrormessage(errorCode + "-" + errorMessage);
+        });
+    } else {
+      signInWithEmailAndPassword(auth, email.current.value, password.current.value)
+        .then((userCredential) => {
+          const user = userCredential.user;
+          navigate("/browser");
+        })
+        .catch((error) => {
+          const errorCode = error.code;
+          const errorMessage = error.message;
+          seterrormessage(errorCode + "-" + errorMessage);
+        });
+    }
   }
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="relative">
       <Header />
-
-      <div className="relative flex-grow flex justify-center items-center  ">
+      <div className="absolute inset-0">
         <img className="absolute inset-0 w-full h-full object-cover" src={bg_image} alt="Background" />
-        <div className="relative z-10 bg-black bg-opacity-65 rounded-md p-10 max-w-sm w-full ">
-          {signinfo ? <h2 className="text-[2em] font-bold mb-4 text-white px-4">Sign In</h2> : <h2 className="text-[2em] font-bold mb-4 text-white px-4">Sign Up</h2>}
-          <form className='p-4 pb-8 relative'>
-           {!signinfo && <div className="mb-3 relative">
-              <input
-                id="name"
-                className="w-full bg-black bg-opacity-65 text-white border border-white rounded-md py-5 px-3"
-                type="text"
-                onFocus={handlenameFocus}
-                onBlur={ handlenameBlur}
-              />
-              <label
-                htmlFor="name"
-                className={`text-white absolute left-3 transition-all ${nameFocused ? 'text-xs -top-1 mt-2 text-gray-400' : 'top-4'}`}
-              >
-                Name
-              </label>
-            </div>}
+      </div>
+      <div className="relative z-10 flex flex-grow justify-center items-center">
+        <div className="bg-black bg-opacity-65 rounded-md p-10 mb-9 max-w-sm w-full">
+          <h2 className="text-[2em] font-bold mb-4 text-white px-4">{signinfo ? "Sign In" : "Sign Up"}</h2>
+          <form onSubmit={(e) => e.preventDefault()} className='p-4 pb-8 relative'>
+            {!signinfo && (
+              <div className="mb-3 relative">
+                <input
+                  id="name"
+                  ref={name}
+                  className="w-full bg-black bg-opacity-65 text-white border border-white rounded-md py-5 px-3 focus:outline-none focus:border-2 focus:border-red-500"
+                  type="text"
+                  onFocus={handlenameFocus}
+                  onBlur={handlenameBlur}
+                />
+                <label
+                  htmlFor="name"
+                  className={`text-white absolute left-3 transition-all ${nameFocused ? 'text-xs -top-1 mt-2 text-gray-400 ' : 'top-4'}`}
+                >
+                  Name
+                </label>
+              </div>
+            )}
 
             <div className="mb-3 relative">
               <input
                 id="email"
-                className="w-full bg-black bg-opacity-65 text-white border border-white rounded-md py-5 px-3"
+                ref={email}
+                className="w-full bg-black bg-opacity-65 text-white border border-white rounded-md py-5 px-3 focus:outline-none focus:border-2 focus:border-red-500"
                 type="email"
                 onFocus={handleEmailFocus}
                 onBlur={handleEmailBlur}
@@ -89,7 +150,8 @@ function Login() {
             <div className="mb-3 relative ">
               <input
                 id="password"
-                className="w-full bg-black bg-opacity-65 text-white border border-white rounded-md py-5 px-3"
+                ref={password}
+                className="w-full bg-black bg-opacity-65 text-white border border-white rounded-md py-5 px-3 focus:outline-none focus:border-2 focus:border-red-500"
                 type="password"
                 onFocus={handlePasswordFocus}
                 onBlur={handlePasswordBlur}
@@ -101,13 +163,16 @@ function Login() {
                 Password
               </label>
             </div>
-          { signinfo ? <button className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-md focus:outline-none focus:shadow-outline">
-              Sign In
-            </button> : <button className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-md focus:outline-none focus:shadow-outline">
-              Sign Up
-            </button>}
 
-           { signinfo  ? <p onClick={handleClick} className='text-white mt-7 underline cursor-pointer'>New to Netflix? Sign UP NOW</p> : <p onClick={handleClick} className='text-white mt-7 underline cursor-pointer'>Already Registered? Sign In NOW</p>}
+            <p className='font-semibold text-red-600 m-2'>{errormessage}</p>
+
+            <button onClick={handleClick} className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-md focus:outline-none focus:shadow-outline">
+              {signinfo ? "Sign In" : "Sign UP"}
+            </button>
+
+            <p onClick={handletoogle} className='text-white mt-7 underline cursor-pointer'>
+              {signinfo ? "New to Netflix? Sign UP NOW" : "Already registered? Sign In NOW"}
+            </p>
           </form>
         </div>
       </div>
