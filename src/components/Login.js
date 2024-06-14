@@ -4,7 +4,6 @@ import { bg_image } from '../utils/constants';
 import { checkValiddata } from '../utils/validate';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from '../utils/firebase';
-import { useNavigate } from 'react-router-dom';
 import {updateProfile } from "firebase/auth";
 import { useDispatch } from 'react-redux';
 import { addUserinfo } from '../utils/userSlice';
@@ -17,7 +16,7 @@ function Login() {
   const [signinfo, setsigninfo] = useState(true);
   const [errormessage, seterrormessage] = useState(null);
 
-  const navigate = useNavigate();
+  
   const dispatch = useDispatch();
 
 
@@ -75,7 +74,7 @@ function Login() {
           }).then(() => {
              const {uid , email , displayName} = auth.currentUser;
              dispatch(addUserinfo({uid : uid , email : email , displayName : displayName})); 
-            navigate("/browser");
+           
           }).catch((error) => {
             // An error occurred
             // ...
@@ -88,11 +87,13 @@ function Login() {
           const errorMessage = error.message;
           seterrormessage(errorCode + "-" + errorMessage);
         });
-    } else {
+    } 
+    
+    else {
       signInWithEmailAndPassword(auth, email.current.value, password.current.value)
         .then((userCredential) => {
           const user = userCredential.user;
-          navigate("/browser");
+         
         })
         .catch((error) => {
           const errorCode = error.code;
